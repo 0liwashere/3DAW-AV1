@@ -1,69 +1,100 @@
 <?php
-session_start();
+require_once __DIR__ . '/php/data.php';
 
-$msg = "";
+$page_title = 'Dashboard';
+$active_nav = 'home';
+$css_path   = 'css/style.css';
+include __DIR__ . '/layout/header.php';
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST'){
-    $usuario = $_POST["usuario"];
-    $senha = $_POST["senha"];
-    $logado = false;
-    $funcao = "";
-
-    if (!file_exists("usuarios.txt")){
-        $msg = "<p class='erro'>Erro: Arquivo de usuários não existe. Cadastre um usuário primeiro!</p>";
-    } else {
-        $arquivo = fopen("usuarios.txt", "r") or die("Erro ao abrir arquivo de usuários!");
-        fgets($arquivo); 
-        
-        while(($linha = fgets($arquivo)) !== false){
-            $dados = explode(";", trim($linha)); 
-            $user_arq = $dados[0];
-            $senha_arq = $dados[1];
-            $funcao_arq = $dados[2];
-
-            if ($usuario == $user_arq && $senha == $senha_arq){
-                $logado = true;
-                $funcao = $funcao_arq;
-                break;
-            }
-        }
-        fclose($arquivo);
-    }
-    
-    if ($logado){
-        $_SESSION['funcao'] = $funcao; 
-        
-        if ($funcao == 'gestor'){
-            header("Location: gestor.php");
-            exit;
-        } else if ($funcao == 'funcionario'){
-            header("Location: funcionario.php");
-            exit;
-        }
-    } else if($_SERVER['REQUEST_METHOD'] == 'POST'){
-        $msg = "<p class='erro'>Usuário ou senha inválidos.</p>";
-    }
-}
+$questions = get_all_questions();
+$total     = count($questions);
+$multipla  = count(array_filter($questions, fn($q) => $q['tipo'] === 'multipla'));
+$texto     = count(array_filter($questions, fn($q) => $q['tipo'] === 'texto'));
+$usuarios  = get_all_users();
 ?>
-<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Login - Jogo Corporativo</title>
-        <link rel="stylesheet" href="style.css">
-    </head>
-    <body>
-        <h1>Home Jogo Corporativo - Login</h1>
-        
-        <form action="index.php" method="POST">
-            Usuário: <input type="text" name="usuario" required>
-            <br><br>
-            Senha: <input type="password" name="senha" required>
-            <br><br>
-            <input type="submit" value="Entrar">
-        </form>
 
-        <p><?php echo $msg; ?></p>
-    </body>
-</html>
+<div class="page-header">
+  <div class="accent-line"></div>
+  <h1>Dashboard</h1>
+  <p>Visão geral do sistema de perguntas e respostas</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-number"><?= $total ?></div>
+    <div class="stat-label">📋 Total de Perguntas</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number"><?= $multipla ?></div>
+    <div class="stat-label">🔵 Múltipla Escolha</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number"><?= $texto ?></div>
+    <div class="stat-label">🟡 Texto Livre</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number"><?= count($usuarios) ?></div>
+    <div class="stat-label">👤 Usuários</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">⚡ Ações Rápidas</div>
+  <div class="btn-group">
+    <a href="criar_multipla.php" class="btn btn-primary">🔵 Nova Múltipla Escolha</a>
+    <a href="criar_texto.php"    class="btn btn-warning">🟡 Nova Pergunta de Texto</a>
+    <a href="listar.php"         class="btn btn-secondary">📋 Ver Todas</a>
+    <a href="usuarios.php"       class="btn btn-secondary">👤 Usuários</a>
+  </div>
+</div>
+
+<?php if ($total > 0): ?>
+<div class="card">
+  <div class="card-title">🕓 Últimas Perguntas</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Enunciado</th>
+          <th>Tipo</th>
+          <th>Respostas</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach (array_slice(array_reverse($questions), 0, 5) as $q): ?>
+        <tr>
+          <td><?= htmlspecialchars(mb_substr($q['enunciado'], 0, 60)) ?>
+              <?= mb_strlen($q['enunciado']) > 60 ? '…' : '' ?>
+          </td>
+          <td>
+            <?php if ($q['tipo'] === 'multipla'): ?>
+              <span class="badge badge-multiple">🔵 Múltipla</span>
+            <?php else: ?>
+              <span class="badge badge-text">🟡 Texto</span>
+            <?php endif; ?>
+          </td>
+          <td><?= count($q['respostas']) ?></td>
+          <td>
+            <div class="btn-group">
+              <a href="ver.php?id=<?= urlencode($q['id']) ?>"     class="btn btn-secondary btn-sm">👁 Ver</a>
+              <a href="<?= $q['tipo'] === 'multipla' ? 'editar_multipla.php' : 'editar_texto.php' ?>?id=<?= urlencode($q['id']) ?>" class="btn btn-warning btn-sm">✏️ Editar</a>
+            </div>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+</div>
+<?php else: ?>
+<div class="card">
+  <div class="empty-state">
+    <div class="empty-icon">🎯</div>
+    <p>Nenhuma pergunta cadastrada ainda.</p>
+    <a href="criar_multipla.php" class="btn btn-primary">Criar primeira pergunta</a>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php include __DIR__ . '/layout/footer.php'; ?>
